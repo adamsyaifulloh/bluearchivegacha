@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gacha Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="common-bg">
+<div class="music-player">
+    <audio id="audioPlayer" loop preload="auto"></audio>
+    <div class="player-controls">
+        <button id="prevBtn" class="music-btn" title="Previous">⏮</button>
+        <button id="playPauseBtn" class="music-btn" title="Play/Pause">▶</button>
+        <button id="nextBtn" class="music-btn" title="Next">⏭</button>
+        <button id="stopBtn" class="music-btn" title="Stop">⏹</button>
+        <button id="shuffleBtn" class="music-btn" title="Shuffle">🔀</button>
+        <button id="repeatBtn" class="music-btn" title="Repeat">🔁</button>
+    </div>
+    <div class="volume-control">
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7">
+    </div>
+    <div class="song-info">No song playing</div>
+</div>
+
+<div class="white">
+  <div class="triangles">
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+    <div class="triangle"></div>
+  </div>
+</div>
+
+<div class="video-background">
+    <video autoplay muted loop id="bgVideo" style="display:none;">
+        <source src="" type="video/mp4">
+    </video>
+</div>
+
+
+
+    <div class="container">
+        <div class="header">
+            <h1>SE</h1>
+        </div>
+        
+        <div class="gacha-container">
+            <div class="card-display" id="cardDisplay">
+                <!-- Cards will appear here -->
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="roll-btn" id="roll1" style="vertical-align:middle"><span>1 Roll</span></button>
+            <button class="roll-btn" id="roll3" style="vertical-align:middle"><span>3 Rolls</span></button>
+            <button class="roll-btn" id="roll5" style="vertical-align:middle"><span>5 Rolls</span></button>
+            <button class="roll-btn" id="roll10" style="vertical-align:middle"><span>10 Rolls</span></button>
+        </div>
+    </div>
+<div id="stars"></div>
+<div id="stars2"></div>
+<div id="stars3"></div>
+<button id="fullscreenBtn" class="fullscreen-btn" title="Toggle Fullscreen">⛶</button>
+<script>
+    // Configuration
+let rates = {
+    common: 0.90, 
+    rare: 0.095,
+    superRare: 0.005
+};
+
+let highestRarityInCurrentRoll = 'common';
+let auraIntervals = [];
+let backgroundSquare = null;
+
+// Daftar video yang tersedia
+const availableVideos = ['v1.mp4', 'v2.mp4', 'v3.mp4', 'v4.mp4', 'v5.mp4', 'v6.mp4', 'v7.mp4', 'v8.mp4', 'v9.mp4', 'v10.mp4', 'v11.mp4', 'v12.mp4', 'v13.mp4', 'v14.mp4', 'v15.mp4', 'v16.mp4',
+ 'v17.mp4', 'v18.mp4', 'v19.mp4', 'v20.mp4', 'v21.mp4', 'v22.mp4', 'v23.mp4', 'v24.mp4', 'v25.mp4', 'v26.mp4', 'v27.mp4', 'v28.mp4', 'v29.mp4', 'v30.mp4', 'v31.mp4', 'v32.mp4', 'v33.mp4', 'v34.mp4'
+, 'v35.mp4', 'v36.mp4', 'v37.mp4', 'v38.mp4', 'v39.mp4', 'v41.mp4'];
+
+// DOM Elements
+const cardDisplay = document.getElementById('cardDisplay');
+const roll1Btn = document.getElementById('roll1');
+const roll3Btn = document.getElementById('roll3');
+const roll5Btn = document.getElementById('roll5');
+const roll10Btn = document.getElementById('roll10');
+
+// Fungsi untuk mengatur video background
+function setRandomVideo() {
+    const videoElement = document.getElementById('bgVideo');
+    const videoContainer = document.querySelector('.video-background');
+    const randomIndex = Math.floor(Math.random() * availableVideos.length);
+    const randomVideo = availableVideos[randomIndex];
+    
+    videoElement.src = randomVideo;
+    videoElement.load();
+    
+    // Tambahkan class force-cover ke container video
+    videoContainer.classList.add('force-cover');
+    
+    videoElement.play().catch(e => console.log("Autoplay prevented:", e));
+    videoElement.style.display = 'block';
+    document.body.style.backgroundImage = 'none';
+    
+    // Handle ketika video siap diputar
+    videoElement.oncanplay = function() {
+        // Sesuaikan ukuran video berdasarkan aspect ratio
+        const aspectRatio = videoElement.videoWidth / videoElement.videoHeight;
+        const windowAspectRatio = window.innerWidth / window.innerHeight;
+        
+        if (aspectRatio > windowAspectRatio) {
+            // Video lebih lebar dari window
+            videoElement.style.width = '100%';
+            videoElement.style.height = 'auto';
+        } else {
+            // Video lebih tinggi dari window
+            videoElement.style.width = 'auto';
+            videoElement.style.height = '100%';
+        }
+    };
+}
+
+function hideVideoAndShowBackground() {
+    const videoElement = document.getElementById('bgVideo');
+    const videoContainer = document.querySelector('.video-background');
+    videoElement.style.display = 'none';
+    videoContainer.classList.remove('force-cover');
+    document.body.style.backgroundImage = '';
+}
+
+// Fungsi untuk background square
+function updateBackgroundSquare(rarity = 'common') {
+    if (!backgroundSquare) {
+        backgroundSquare = document.createElement('div');
+        backgroundSquare.className = `background-square ${rarity}`;
+        document.body.appendChild(backgroundSquare);
+    } else {
+        backgroundSquare.classList.remove('common', 'rare', 'superrare');
+        backgroundSquare.classList.add(rarity);
+    }
+}
+
+function hideBackgroundSquare() {
+    if (backgroundSquare) {
+        backgroundSquare.classList.remove('active');
+        backgroundSquare.style.opacity = '0';
+    }
+}
+
+function showBackgroundSquare() {
+    if (backgroundSquare) {
+        backgroundSquare.classList.add('active');
+        backgroundSquare.style.opacity = '0';
+    }
+}
+
+// Function to get random gacha result
+function getGachaResult() {
+    const rand = Math.random();
+    let rarity, image;
+    
+    if (rand < rates.superRare) {
+        rarity = 'superrare';
+        image = 'superrare.png';
+    } else if (rand < rates.superRare + rates.rare) {
+        rarity = 'rare';
+        image = 'rare.png';
+    } else {
+        rarity = 'common';
+        image = 'common.png';
+    }
+    
+    return { rarity, image };
+}
+
+// Function to create aura effect
+function createAuraEffect(card) {
+    const aura = document.createElement('div');
+    aura.className = 'aura-effect';
+    
+    const cardRect = card.getBoundingClientRect();
+    aura.style.left = `${cardRect.left - 10}px`;
+    aura.style.top = `${cardRect.top - 10}px`;
+    aura.style.width = `${cardRect.width + 20}px`;
+    aura.style.height = `${cardRect.height + 20}px`;
+    
+    if (card.classList.contains('superrare')) {
+        aura.style.borderColor = '#ff00cc';
+        aura.style.boxShadow = '0 0 15px #ff00cc';
+        aura.style.animationDuration = '0.8s';
+    } else if (card.classList.contains('rare')) {
+        aura.style.borderColor = '#ffc107';
+        aura.style.boxShadow = '0 0 10px #ffc107';
+        aura.style.animationDuration = '1s';
+    } else {
+        aura.style.borderColor = '#1a73e8';
+        aura.style.boxShadow = '0 0 5px #1a73e8';
+        aura.style.animationDuration = '1.2s';
+    }
+    
+    document.body.appendChild(aura);
+    
+    setTimeout(() => {
+        if (aura.parentNode) {
+            aura.remove();
+        }
+    }, aura.style.animationDuration.includes('ms') ? 
+       parseFloat(aura.style.animationDuration) : 
+       parseFloat(aura.style.animationDuration) * 1000);
+}
+
+function startAuraInterval(card) {
+    createAuraEffect(card);
+    const interval = setInterval(() => {
+        createAuraEffect(card);
+    }, 2000);
+    return interval;
+}
+
+function createParticles(card) {
+    const cardRect = card.getBoundingClientRect();
+    const centerX = cardRect.left + cardRect.width / 2;
+    const centerY = cardRect.top + cardRect.height / 2;
+    const rarity = card.classList.contains('superrare') ? 'superrare' : 
+                 card.classList.contains('rare') ? 'rare' : 'common';
+    
+    for (let i = 0; i < 2; i++) {
+        const particle = document.createElement('div');
+        particle.className = `particle ${rarity}`;
+        
+        const angle = i === 0 ? Math.PI/4 : 3*Math.PI/4;
+        const distance = 100;
+        const tx = Math.cos(angle) * distance;
+        const ty = Math.sin(angle) * distance;
+        
+        const size = 8;
+        
+        particle.style.setProperty('--tx', `${tx}px`);
+        particle.style.setProperty('--ty', `${ty}px`);
+        particle.style.left = `${centerX}px`;
+        particle.style.top = `${centerY}px`;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        document.body.appendChild(particle);
+        
+        setTimeout(() => {
+            particle.remove();
+        }, 1000);
+    }
+}
+
+function getRandomBackImage(rarity) {
+    const randomNum = Math.floor(Math.random() * 10) + 1;
+    switch(rarity) {
+        case 'rare': return `b${randomNum}.png`;
+        case 'superrare': return `c${randomNum}.png`;
+        default: return `a${randomNum}.png`;
+    }
+}
+
+function createStars() {
+    function multipleBoxShadow(n) {
+        let value = '';
+        for (let i = 0; i < n; i++) {
+            value += `${Math.floor(Math.random() * 2000)}px ${Math.floor(Math.random() * 2000)}px #FFF`;
+            if (i < n - 1) value += ', ';
+        }
+        return value;
+    }
+
+    document.getElementById('stars').style.boxShadow = multipleBoxShadow(700);
+    document.getElementById('stars2').style.boxShadow = multipleBoxShadow(200);
+    document.getElementById('stars3').style.boxShadow = multipleBoxShadow(100);
+}
+
+function displayRandomCards() {
+    console.log('displayRandomCards called');
+    setRandomVideo();
+    
+    document.querySelectorAll('.aura-effect').forEach(aura => aura.remove());
+    document.querySelectorAll('.card.superrare').forEach(card => {
+        card.classList.remove('shaking');
+    });
+    auraIntervals.forEach(interval => clearInterval(interval));
+    auraIntervals = [];
+    cardDisplay.innerHTML = '';
+    cardDisplay.classList.remove('rolling', 'single-card', 'multiple-cards');
+    
+    for (let i = 0; i < 10; i++) {
+        const result = getGachaResult();
+        const card = document.createElement('div');
+        card.className = `card ${result.rarity}`;
+        card.innerHTML = `<img src="${result.image}" alt="${result.rarity} card">`;
+        cardDisplay.appendChild(card);
+    }
+    
+    document.body.className = 'common-bg';
+    
+    document.querySelectorAll('.roll-btn').forEach(btn => {
+        if (btn.id !== 'gachaLagi') {
+            btn.style.display = '';
+        }
+    });
+    const gachaLagiBtn = document.getElementById('gachaLagi');
+    if (gachaLagiBtn) {
+        gachaLagiBtn.remove();
+    }
+
+    hideBackgroundSquare();
+}
+
+function rollGacha(count) {
+    console.log('rollGacha called with count:', count);
+    if (cardDisplay.classList.contains('rolling')) return;
+    
+    hideVideoAndShowBackground();
+    highestRarityInCurrentRoll = 'common';
+    
+    document.querySelectorAll('.roll-btn').forEach(btn => {
+        btn.style.display = 'none';
+    });
+    
+    const flashOverlay = document.createElement('div');
+    flashOverlay.className = 'flash-overlay';
+    document.body.appendChild(flashOverlay);
+    
+    cardDisplay.innerHTML = '';
+    cardDisplay.classList.add('rolling');
+    
+    if (count === 1) {
+        cardDisplay.classList.add('single-card');
+        cardDisplay.classList.remove('multiple-cards');
+    } else {
+        cardDisplay.classList.add('multiple-cards');
+        cardDisplay.classList.remove('single-card');
+    }
+    
+    setTimeout(() => {
+        flashOverlay.classList.add('active');
+    }, 50);
+    
+    for (let i = 0; i < 10; i++) {
+        const card = document.createElement('div');
+        card.className = 'card spinning';
+        card.innerHTML = `<img src="common.png" alt="Card">`;
+        cardDisplay.appendChild(card);
+    }
+    
+    setTimeout(() => {
+        cardDisplay.innerHTML = '';
+        cardDisplay.classList.add('shake');
+        
+        setTimeout(() => {
+            cardDisplay.classList.remove('shake');
+            
+            flashOverlay.classList.remove('active');
+            setTimeout(() => {
+                flashOverlay.remove();
+            }, 200);
+            
+            for (let i = 0; i < count; i++) {
+                const result = getGachaResult();
+                const card = document.createElement('div');
+                card.className = `card result ${result.rarity}`;
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-front">
+                            <img src="${result.image}" alt="${result.rarity} card">
+                        </div>
+                        <div class="card-back">
+                            <img src="${getRandomBackImage(result.rarity)}" alt="Card back">
+                        </div>
+                    </div>
+                `;
+                cardDisplay.appendChild(card);
+                
+                if (result.rarity === 'superrare') {
+                    highestRarityInCurrentRoll = 'superrare';
+                } else if (result.rarity === 'rare' && highestRarityInCurrentRoll !== 'superrare') {
+                    highestRarityInCurrentRoll = 'rare';
+                }
+            }
+            
+            document.body.className = highestRarityInCurrentRoll + '-bg';
+            updateBackgroundSquare(highestRarityInCurrentRoll);
+            showBackgroundSquare();
+            
+            const gachaLagiBtn = document.createElement('button');
+            gachaLagiBtn.className = 'roll-btn';
+            gachaLagiBtn.id = 'gachaLagi';
+            gachaLagiBtn.innerHTML = '<span>BACK</span>';
+            gachaLagiBtn.addEventListener('click', displayRandomCards);
+            document.querySelector('.controls').appendChild(gachaLagiBtn);
+            
+            setTimeout(() => {
+                const cards = document.querySelectorAll('.card.result');
+                cards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.classList.add('bounce');
+                        
+                        setTimeout(() => {
+                            if (card.classList.contains('superrare')) {
+                                const interval = startAuraInterval(card);
+                                auraIntervals.push(interval);
+                                
+                                const startShakeInterval = () => {
+                                    card.classList.add('shaking');
+                                    setTimeout(() => {
+                                        card.classList.remove('shaking');
+                                        setTimeout(() => {
+                                            startShakeInterval();
+                                        }, 2000);
+                                    }, 1000);
+                                };
+                                startShakeInterval();
+                            }
+                            
+                            createAuraEffect(card);
+                            createParticles(card);
+                        }, 500);
+                    }, index * 100);
+                });
+                
+                cardDisplay.classList.remove('rolling');
+            }, 100);
+        }, 1000);
+    }, 1000);
+}
+
+// Event listeners
+roll1Btn.addEventListener('click', () => rollGacha(1));
+roll3Btn.addEventListener('click', () => rollGacha(3));
+roll5Btn.addEventListener('click', () => rollGacha(5));
+roll10Btn.addEventListener('click', () => rollGacha(10));
+
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+    setRandomVideo();
+    createStars();
+    updateBackgroundSquare();
+    hideBackgroundSquare();
+    displayRandomCards();
+});
+
+
+// Music player configuration
+const musicFiles = ['m1.mp3', 'm2.mp3', 'm3.mp3', 'm4.mp3', 'm5.mp3']; // Add more as needed
+let currentSongIndex = 0;
+let isPlaying = false;
+let isShuffle = false;
+let isRepeat = false;
+let originalPlaylist = [...musicFiles];
+let shuffledPlaylist = [...musicFiles];
+
+// DOM Elements
+const audioPlayer = document.getElementById('audioPlayer');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const stopBtn = document.getElementById('stopBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const repeatBtn = document.getElementById('repeatBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+const songInfo = document.querySelector('.song-info');
+
+// Function to shuffle array
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Function to load and play a song
+function loadSong(index) {
+    if (musicFiles.length === 0) return;
+    
+    if (index >= 0 && index < musicFiles.length) {
+        currentSongIndex = index;
+        audioPlayer.src = musicFiles[currentSongIndex];
+        audioPlayer.load();
+        songInfo.textContent = `Playing: ${musicFiles[currentSongIndex].replace('.mp3', '')}`;
+        
+        if (isPlaying) {
+            audioPlayer.play().catch(e => console.log("Autoplay prevented:", e));
+        }
+    }
+}
+
+// Function to play next song
+function nextSong() {
+    if (musicFiles.length === 0) return;
+    
+    if (isRepeat) {
+        loadSong(currentSongIndex);
+    } else {
+        currentSongIndex = (currentSongIndex + 1) % musicFiles.length;
+        loadSong(currentSongIndex);
+    }
+    
+    if (isPlaying) {
+        audioPlayer.play().catch(e => console.log("Autoplay prevented:", e));
+    }
+}
+
+// Function to play previous song
+function prevSong() {
+    if (musicFiles.length === 0) return;
+    
+    currentSongIndex = (currentSongIndex - 1 + musicFiles.length) % musicFiles.length;
+    loadSong(currentSongIndex);
+    if (isPlaying) {
+        audioPlayer.play().catch(e => console.log("Autoplay prevented:", e));
+    }
+}
+
+// Function to toggle shuffle
+function toggleShuffle() {
+    isShuffle = !isShuffle;
+    shuffleBtn.style.opacity = isShuffle ? '1' : '0.5';
+    
+    if (isShuffle) {
+        shuffledPlaylist = [...originalPlaylist];
+        shuffleArray(shuffledPlaylist);
+        musicFiles = [...shuffledPlaylist];
+        // Find current song in new shuffled playlist
+        const currentSong = audioPlayer.src.split('/').pop();
+        currentSongIndex = musicFiles.indexOf(currentSong);
+        if (currentSongIndex === -1) currentSongIndex = 0;
+    } else {
+        musicFiles = [...originalPlaylist];
+        // Find current song in original playlist
+        const currentSong = audioPlayer.src.split('/').pop();
+        currentSongIndex = musicFiles.indexOf(currentSong);
+        if (currentSongIndex === -1) currentSongIndex = 0;
+    }
+}
+
+// Function to toggle repeat
+function toggleRepeat() {
+    isRepeat = !isRepeat;
+    repeatBtn.style.opacity = isRepeat ? '1' : '0.5';
+    audioPlayer.loop = isRepeat;
+}
+
+// Event listeners for buttons
+playPauseBtn.addEventListener('click', () => {
+    if (isPlaying) {
+        audioPlayer.pause();
+        playPauseBtn.textContent = '▶';
+        playPauseBtn.title = 'Play';
+    } else {
+        audioPlayer.play().catch(e => console.log("Autoplay prevented:", e));
+        playPauseBtn.textContent = '⏸';
+        playPauseBtn.title = 'Pause';
+    }
+    isPlaying = !isPlaying;
+});
+
+prevBtn.addEventListener('click', prevSong);
+nextBtn.addEventListener('click', nextSong);
+
+stopBtn.addEventListener('click', () => {
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    playPauseBtn.textContent = '▶';
+    playPauseBtn.title = 'Play';
+    isPlaying = false;
+});
+
+shuffleBtn.addEventListener('click', toggleShuffle);
+repeatBtn.addEventListener('click', toggleRepeat);
+
+// Volume control
+volumeSlider.addEventListener('input', () => {
+    audioPlayer.volume = volumeSlider.value;
+});
+
+// When song ends, play next
+audioPlayer.addEventListener('ended', () => {
+    if (!isRepeat) {
+        nextSong();
+    }
+});
+
+// Initialize player
+function initMusicPlayer() {
+    // Set initial volume
+    audioPlayer.volume = volumeSlider.value;
+    
+    // Set initial button states
+    shuffleBtn.style.opacity = '0.5';
+    repeatBtn.style.opacity = '0.5';
+    
+    // Load first song
+    loadSong(0);
+    
+    // Try to autoplay when page loads (will likely fail in most browsers)
+    const tryAutoplay = () => {
+        const playPromise = audioPlayer.play();
+        
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    isPlaying = true;
+                    playPauseBtn.textContent = '⏸';
+                    playPauseBtn.title = 'Pause';
+                })
+                .catch(e => {
+                    console.log("Autoplay prevented:", e);
+                    // Show play button instead
+                    isPlaying = false;
+                    playPauseBtn.textContent = '▶';
+                    playPauseBtn.title = 'Play';
+                    
+                    // Add a click event listener to start playback on first interaction
+                    document.addEventListener('click', firstInteractionListener, { once: true });
+                });
+        }
+    };
+    
+    const firstInteractionListener = () => {
+        audioPlayer.play()
+            .then(() => {
+                isPlaying = true;
+                playPauseBtn.textContent = '⏸';
+                playPauseBtn.title = 'Pause';
+            })
+            .catch(e => console.log("Still couldn't play:", e));
+    };
+    
+    // Try autoplay immediately
+    tryAutoplay();
+    
+    // Also try autoplay when the page becomes visible (if it was preloaded)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !isPlaying) {
+            tryAutoplay();
+        }
+    });
+}
+
+// Initialize music player when DOM is loaded
+window.addEventListener('DOMContentLoaded', () => {
+    setRandomVideo();
+    createStars();
+    updateBackgroundSquare();
+    hideBackgroundSquare();
+    displayRandomCards();
+    initMusicPlayer(); // Initialize music player
+});
+// Fullscreen functionality
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+        fullscreenBtn.textContent = '⛶';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+            fullscreenBtn.textContent = '⛶';
+        }
+    }
+}
+
+fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+// Update icon based on fullscreen state
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+        fullscreenBtn.textContent = '⛶';
+    } else {
+        fullscreenBtn.textContent = '⛶';
+    }
+});
+
+</script>
+</body>
+</html>
